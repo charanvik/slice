@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astrology Chart Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- Base Styles --- */
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* --- Custom Scrollbar --- */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* --- SVG Chart Styles --- */
+        .house { 
+            fill: #1e293b; /* slate-800 */
+            stroke: #475569; /* slate-600 */
+            stroke-width: 1.5; 
+            transition: fill 0.3s ease;
+        }
+        .house:hover {
+            fill: #334155; /* slate-700 */
+        }
+        .planet-label { 
+            font-family: 'Inter', sans-serif; 
+            font-size: 14px; 
+            font-weight: 600; 
+            fill: #e2e8f0; /* slate-200 */
+            text-anchor: middle; 
+            dominant-baseline: middle; 
+            pointer-events: all; /* Allow events for tooltips */
+            cursor: pointer;
+            transition: fill 0.2s ease;
+        }
+        .planet-label:hover {
+            fill: #5eead4; /* teal-300 */
+        }
+        .planet-label .degree {
+            font-size: 11px;
+            font-weight: 400;
+            fill: #94a3b8; /* slate-400 */
+        }
+        .planet-label.retrograde { fill: #f97316; } /* orange-500 */
+        .planet-label.retrograde:hover { fill: #fb923c; } /* orange-400 */
+        .ascendant-label { fill: #22d3ee; } /* cyan-400 */
+        .ascendant-label:hover { fill: #67e8f9; } /* cyan-300 */
+        .empty-house-marker { 
+            fill: #64748b; /* slate-500 */
+            font-size: 16px;
+            font-weight: 500;
+            pointer-events: none;
+        }
+
+        /* --- Tooltip --- */
+        #chart-tooltip {
+            position: absolute;
+            opacity: 0;
+            visibility: hidden;
+            background-color: rgba(15, 23, 42, 0.8); /* slate-900 with opacity */
+            backdrop-filter: blur(8px);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #334155; /* slate-700 */
+            font-size: 14px;
+            pointer-events: none;
+            transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+            transform: translate(-50%, -100%) translateY(-10px);
+            white-space: nowrap;
+            z-index: 10;
+        }
+
+        /* --- Loading Spinner --- */
+        .loader {
+            width: 50px;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            border: 8px solid #475569;
+            border-right-color: #818cf8; /* indigo-400 */
+            animation: l2 1s infinite linear;
+        }
+        @keyframes l2 {to{transform: rotate(1turn)}}
+
+        /* --- Animation --- */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in-panel {
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-300 antialiased">
+    
+    <!-- Tooltip Element -->
+    <div id="chart-tooltip"></div>
+
+    <div class="min-h-screen w-full p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-gray-900 via-slate-900 to-indigo-900/50">
+        <div class="container mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- Input Form Column -->
+                <div class="lg:col-span-1 bg-slate-800/60 backdrop-blur-lg border border-slate-700 p-6 rounded-2xl shadow-2xl shadow-black/20 fade-in-panel">
+                    <h1 class="text-2xl font-bold text-white mb-6">Birth Details</h1>
+                    <form id="astro-form" class="space-y-4">
+                        <div>
+                            <label for="location" class="block text-sm font-medium text-slate-400 mb-1">Location Name</label>
+                            <div class="flex">
+                                <input type="text" id="location" name="location" placeholder="e.g., Hyderabad, India" class="w-full bg-slate-700/50 border border-slate-600 text-white placeholder-slate-400 p-2.5 rounded-l-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
+                                <button type="button" id="lookup-btn" class="bg-indigo-600 text-white p-2.5 rounded-r-lg hover:bg-indigo-700 transition-colors duration-200 font-semibold">Find</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div><label for="year" class="block text-sm font-medium text-slate-400">Year</label><input type="number" id="year" name="year" required class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></div>
+                            <div><label for="month" class="block text-sm font-medium text-slate-400">Month</label><input type="number" id="month" name="month" required class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></div>
+                            <div><label for="date" class="block text-sm font-medium text-slate-400">Date</label><input type="number" id="date" name="date" required class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></div>
+                            <div><label for="hours" class="block text-sm font-medium text-slate-400">Hours</label><input type="number" id="hours" name="hours" required class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></div>
+                            <div><label for="minutes" class="block text-sm font-medium text-slate-400">Minutes</label><input type="number" id="minutes" name="minutes" required class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></div>
+                            <div><label for="seconds" class="block text-sm font-medium text-slate-400">Seconds</label><input type="number" id="seconds" name="seconds" value="0" required class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></div>
+                            <div><label for="latitude" class="block text-sm font-medium text-slate-400">Latitude</label><input type="number" id="latitude" name="latitude" step="any" required class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></div>
+                            <div><label for="longitude" class="block text-sm font-medium text-slate-400">Longitude</label><input type="number" id="longitude" name="longitude" step="any" required class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></div>
+                            <div class="sm:col-span-2"><label for="timezone" class="block text-sm font-medium text-slate-400">Timezone</label><input type="number" id="timezone" name="timezone" step="any" required class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"></div>
+                            
+                            <div>
+                                <label for="observation_point" class="block text-sm font-medium text-slate-400">Obs. Point</label>
+                                <select id="observation_point" name="observation_point" class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                                    <option value="topocentric">Topocentric</option>
+                                    <option value="geocentric">Geocentric</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="ayanamsha" class="block text-sm font-medium text-slate-400">Ayanamsha</label>
+                                <select id="ayanamsha" name="ayanamsha" class="mt-1 w-full bg-slate-700/50 border border-slate-600 text-white p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                                    <option value="lahiri">Lahiri</option>
+                                    <option value="sayana">Sayana</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="pt-4">
+                            <button type="submit" id="get-chart-btn" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-3 rounded-lg font-bold text-base shadow-lg hover:shadow-indigo-500/50 transform hover:-translate-y-0.5 transition-all duration-300">Generate Chart</button>
+                        </div>
+                    </form>
+                    <div id="results" class="mt-4 text-center text-sm min-h-[20px]"></div>
+                </div>
+
+                <!-- Chart Column -->
+                <div class="lg:col-span-2 bg-slate-800/60 backdrop-blur-lg border border-slate-700 p-4 sm:p-6 rounded-2xl shadow-2xl shadow-black/20 fade-in-panel" style="animation-delay: 150ms;">
+                    <h1 class="text-3xl font-bold text-center text-white mb-4">Vedic Astrology Chart</h1>
+                    <div id="chart-container" class="w-full max-w-2xl mx-auto relative flex items-center justify-center min-h-[400px] sm:min-h-[600px]">
+                        <div id="loader-container" class="absolute inset-0 flex items-center justify-center bg-slate-800/50 rounded-lg z-10 hidden">
+                            <div class="loader"></div>
+                        </div>
+                        <svg id="astro-chart" class="w-full h-auto" viewBox="0 0 800 800" preserveAspectRatio="xMidYMid meet">
+                            <polygon class="house" points="400 100,250 250,400 400,550 250" id="house1" />
+                            <polygon class="house" points="100 100, 250 250,400 100" id="house2" />
+                            <polygon class="house" points="100 400,250 250,100 100" id="house3" />
+                            <polygon class="house" points="250 250,100 400,250 550,400 400" id="house4" />
+                            <polygon class="house" points="100 400,250 550,100 700" id="house5" />
+                            <polygon class="house" points="100 700,250 550,400 700" id="house6" />
+                            <polygon class="house" points="400 400,250 550,400 700,550 550" id="house7" />
+                            <polygon class="house" points="400 700,550 550,700 700" id="house8" />
+                            <polygon class="house" points="700 400,550 550,700 700" id="house9" />
+                            <polygon class="house" points="550 250,700 400,550 550,400 400" id="house10" />
+                            <polygon class="house" points="700 100,550 250,700 400" id="house11" />
+                            <polygon class="house" points="400 100,550 250,700 100" id="house12" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM ELEMENTS & CONSTANTS ---
+        const planetSymbols = { "Ascendant": "As", "Sun": "Su", "Moon": "Mo", "Mars": "Ma", "Mercury": "Me", "Jupiter": "Ju", "Venus": "Ve", "Saturn": "Sa", "Rahu": "Ra", "Ketu": "Ke" };
+        const svg = document.getElementById('astro-chart');
+        const resultsContainer = document.getElementById('results');
+        const form = document.getElementById('astro-form');
+        const lookupBtn = document.getElementById('lookup-btn');
+        const locationInput = document.getElementById('location');
+        const latInput = document.getElementById('latitude');
+        const lonInput = document.getElementById('longitude');
+        const tooltip = document.getElementById('chart-tooltip');
+        const loaderContainer = document.getElementById('loader-container');
+
+        // --- CHART RENDERING & INTERACTIVITY ---
+
+        function showTooltip(evt, planetInfo) {
+            const degree = parseFloat(planetInfo.degree).toFixed(2);
+            const retro = planetInfo.isRetro ? ' (Retrograde)' : '';
+            tooltip.innerHTML = `<strong>${planetInfo.name}${retro}</strong><br>${degree}° in Sign ${planetInfo.sign}`;
+            tooltip.style.left = `${evt.pageX}px`;
+            tooltip.style.top = `${evt.pageY}px`;
+            tooltip.style.opacity = '1';
+            tooltip.style.visibility = 'visible';
+            tooltip.style.transform = 'translate(-50%, -100%) translateY(0px)';
+        }
+
+        function hideTooltip() {
+            tooltip.style.opacity = '0';
+            tooltip.style.visibility = 'hidden';
+            tooltip.style.transform = 'translate(-50%, -100%) translateY(-10px)';
+        }
+        
+        function clearChart() {
+            const labels = svg.querySelectorAll('.planet-label, .empty-house-marker');
+            labels.forEach(label => label.remove());
+        }
+
+        function parseAstroData(rawPlanetData) {
+            const parsedData = {};
+            for (const key in rawPlanetData) {
+                const planet = rawPlanetData[key];
+                if (planet && planet.name) {
+                    parsedData[planet.name] = {
+                        name: planet.name,
+                        sign: planet.current_sign,
+                        isRetro: planet.isRetro === 'true',
+                        degree: planet.normDegree
+                    };
+                }
+            }
+            return parsedData;
+        }
+        
+        function createSignToHouseMap(ascendantSign) {
+            const antiClockwiseHouseIds = ['house1', 'house2', 'house3', 'house4', 'house5', 'house6', 'house7', 'house8', 'house9', 'house10', 'house11', 'house12'];
+            const signToHouseIdMap = {};
+            for (let i = 0; i < 12; i++) {
+                const signNumber = (ascendantSign - 1 + i) % 12 + 1;
+                signToHouseIdMap[signNumber] = antiClockwiseHouseIds[i];
+            }
+            return signToHouseIdMap;
+        }
+
+        /**
+         * Calculates the geometric center (centroid) of a polygon's vertices.
+         * This provides a more accurate center point than a simple bounding box.
+         * @param {Array<Object>} pts - Array of points, e.g., [{x: 10, y: 20}, ...]
+         * @returns {Object} The {x, y} coordinates of the centroid.
+         */
+        function getPolygonCentroid(pts) {
+            let first = pts[0], last = pts[pts.length - 1];
+            if (first.x !== last.x || first.y !== last.y) pts.push(first);
+            let twicearea = 0, x = 0, y = 0, nPts = pts.length, p1, p2, f;
+            for (let i = 0, j = nPts - 1; i < nPts; j = i++) {
+                p1 = pts[i]; p2 = pts[j];
+                f = p1.x * p2.y - p2.x * p1.y;
+                twicearea += f;
+                x += (p1.x + p2.x) * f;
+                y += (p1.y + p2.y) * f;
+            }
+            f = twicearea * 3;
+            return (f === 0) ? { x: pts[0].x, y: pts[0].y } : { x: x / f, y: y / f };
+        }
+
+
+        function renderChart(astroData) {
+            clearChart();
+            if (!astroData.Ascendant) {
+                console.error("Ascendant data is missing.");
+                resultsContainer.textContent = 'Error: Ascendant data missing.';
+                return;
+            }
+
+            const ascendantSign = astroData.Ascendant.sign;
+            const signToHouseMap = createSignToHouseMap(ascendantSign);
+
+            const housesWithPlanets = {};
+            for (const planetName in astroData) {
+                const planet = astroData[planetName];
+                const houseId = signToHouseMap[planet.sign];
+                if (houseId) {
+                    if (!housesWithPlanets[houseId]) housesWithPlanets[houseId] = [];
+                    housesWithPlanets[houseId].push(planet);
+                }
+            }
+
+            const houseIdToSignMap = Object.fromEntries(Object.entries(signToHouseMap).map(([k, v]) => [v, k]));
+
+            for (let i = 1; i <= 12; i++) {
+                const houseId = `house${i}`;
+                const housePolygon = document.getElementById(houseId);
+                if (!housePolygon) continue;
+
+                if (housesWithPlanets[houseId]) {
+                    const planetsInHouse = housesWithPlanets[houseId];
+                    const numPlanets = planetsInHouse.length;
+                    
+                    // Get the true geometric center of the house polygon
+                    const points = Array.from(housePolygon.points).map(p => ({ x: p.x, y: p.y }));
+                    const centroid = getPolygonCentroid(points);
+
+                    // Define positions relative to the centroid
+                    const positions = [];
+                    const spacing = 24;
+                    const smallSpacing = 18;
+
+                    if (numPlanets === 1) {
+                        positions.push({ x: 0, y: 0 });
+                    } else if (numPlanets === 2) {
+                        positions.push({ x: 0, y: -smallSpacing / 2 });
+                        positions.push({ x: 0, y: smallSpacing / 2 });
+                    } else if (numPlanets === 3) {
+                        positions.push({ x: 0, y: -smallSpacing });
+                        positions.push({ x: -smallSpacing, y: smallSpacing / 2 });
+                        positions.push({ x: smallSpacing, y: smallSpacing / 2 });
+                    } else if (numPlanets === 4) {
+                        positions.push({ x: -smallSpacing, y: -smallSpacing });
+                        positions.push({ x: smallSpacing, y: -smallSpacing });
+                        positions.push({ x: -smallSpacing, y: smallSpacing });
+                        positions.push({ x: smallSpacing, y: smallSpacing });
+                    } else { // Fallback to a centered grid for 5+ planets
+                        const cols = numPlanets > 6 ? 3 : 2;
+                        const rows = Math.ceil(numPlanets / cols);
+                        for (let j = 0; j < numPlanets; j++) {
+                            const row = Math.floor(j / cols);
+                            const col = j % cols;
+                            const itemsInRow = (row === rows - 1) ? (numPlanets - row * cols) : cols;
+                            const xOffset = (col - (itemsInRow - 1) / 2) * spacing;
+                            const yOffset = (row - (rows - 1) / 2) * spacing;
+                            positions.push({ x: xOffset, y: yOffset });
+                        }
+                    }
+
+                    planetsInHouse.forEach((planetInfo, index) => {
+                        const pos = positions[index];
+                        const x = centroid.x + (pos ? pos.x : 0);
+                        const y = centroid.y + (pos ? pos.y : 0);
+
+                        const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        textElement.setAttribute('x', x);
+                        textElement.setAttribute('y', y);
+                        
+                        const symbol = planetSymbols[planetInfo.name] || planetInfo.name.substring(0, 2);
+                        const degree = Math.round(planetInfo.degree);
+                        
+                        textElement.innerHTML = `${symbol} <tspan class="degree">${degree}°</tspan>`;
+                        textElement.classList.add('planet-label');
+                        if (planetInfo.name === "Ascendant") textElement.classList.add('ascendant-label');
+                        if (planetInfo.isRetro) textElement.classList.add('retrograde');
+                        
+                        textElement.addEventListener('mouseover', (e) => showTooltip(e, planetInfo));
+                        textElement.addEventListener('mouseout', hideTooltip);
+
+                        svg.appendChild(textElement);
+                    });
+                } else {
+                    const signForThisHouse = houseIdToSignMap[houseId];
+                    const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    const centroid = getPolygonCentroid(Array.from(housePolygon.points).map(p => ({ x: p.x, y: p.y })));
+                    textElement.setAttribute('x', centroid.x);
+                    textElement.setAttribute('y', centroid.y);
+                    textElement.textContent = `(${signForThisHouse})`;
+                    textElement.classList.add('empty-house-marker');
+                    svg.appendChild(textElement);
+                }
+            }
+        }
+
+        // --- EVENT LISTENERS & INITIALIZATION ---
+
+        lookupBtn.addEventListener('click', async () => {
+            if (!locationInput.value) {
+                resultsContainer.textContent = 'Please enter a location name.';
+                resultsContainer.style.color = '#f87171'; // red-400
+                return;
+            }
+
+            resultsContainer.textContent = 'Finding coordinates...';
+            resultsContainer.style.color = '#60a5fa'; // blue-400
+
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationInput.value)}`);
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                
+                const data = await response.json();
+                if (data.length > 0) {
+                    latInput.value = parseFloat(data[0].lat).toFixed(5);
+                    lonInput.value = parseFloat(data[0].lon).toFixed(5);
+                    resultsContainer.textContent = 'Coordinates found and populated.';
+                    resultsContainer.style.color = '#4ade80'; // green-400
+                } else {
+                    resultsContainer.textContent = 'Location not found.';
+                    resultsContainer.style.color = '#facc15'; // yellow-400
+                }
+            } catch (error) {
+                resultsContainer.textContent = `Error: ${error.message}`;
+                resultsContainer.style.color = '#f87171';
+            }
+        });
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            loaderContainer.style.display = 'flex';
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            Object.keys(data).forEach(key => {
+                if (['latitude', 'longitude', 'timezone'].includes(key)) data[key] = parseFloat(data[key]);
+                else if (!['location', 'observation_point', 'ayanamsha'].includes(key)) data[key] = parseInt(data[key]);
+            });
+
+            resultsContainer.textContent = 'Generating chart...';
+            resultsContainer.style.color = '#60a5fa';
+
+            try {
+                const response = await fetch('/api/planets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText}`);
+                }
+
+                const result = await response.json();
+                const astroData = parseAstroData(result.output[0]);
+                renderChart(astroData);
+                resultsContainer.textContent = 'Chart generated successfully.';
+                resultsContainer.style.color = '#4ade80';
+            } catch (error) {
+                resultsContainer.textContent = `Error: ${error.message}`;
+                resultsContainer.style.color = '#f87171';
+                console.error(error);
+            } finally {
+                loaderContainer.style.display = 'none';
+            }
+        });
+        
+        function setInitialDateTime() {
+            const now = new Date();
+            // Set for Hyderabad, India (IST is UTC+5:30)
+            const tzOffset = 5.5 * 60 * 60 * 1000;
+            const indiaTime = new Date(now.getTime() + tzOffset + (now.getTimezoneOffset() * 60000));
+
+            document.getElementById('year').value = indiaTime.getUTCFullYear();
+            document.getElementById('month').value = indiaTime.getUTCMonth() + 1;
+            document.getElementById('date').value = indiaTime.getUTCDate();
+            document.getElementById('hours').value = indiaTime.getUTCHours();
+            document.getElementById('minutes').value = indiaTime.getUTCMinutes();
+            
+            // Set default location to Hyderabad
+            document.getElementById('location').value = 'Hyderabad, India';
+            document.getElementById('latitude').value = '17.3850';
+            document.getElementById('longitude').value = '78.4867';
+            document.getElementById('timezone').value = '5.5';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+             setInitialDateTime();
+             // Trigger initial chart generation
+             document.getElementById('get-chart-btn').click();
+        });
+    </script>
+</body>
+</html>

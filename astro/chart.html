@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON-Driven Astrological Chart</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* General body styling */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for the SVG houses (polygons) */
+        .house {
+            fill: #ffffff;
+            stroke: #cbd5e1;
+            stroke-width: 2;
+        }
+        /* Styles for the planet text labels */
+        .planet-label {
+            font-family: 'Arial', sans-serif;
+            font-size: 13px;
+            font-weight: bold;
+            fill: #1e293b;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none;
+        }
+        .planet-label.retrograde {
+            fill: #dc2626;
+        }
+        .ascendant-label {
+            fill: #16a34a;
+        }
+        .empty-house-marker {
+            fill: #94a3b8;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-3xl">
+        <h1 class="text-3xl font-bold text-center text-slate-700 mb-6">Vedic Astrology Chart</h1>
+        
+        <!-- The SVG container for the chart -->
+        <svg
+            id="astro-chart"
+            class="w-full h-auto bg-white rounded-xl shadow-lg"
+            viewBox="0 0 780 800"
+            preserveAspectRatio="xMidYMid meet"
+        >
+            <!-- The 12 houses of the chart are defined here as polygons. -->
+            <polygon class="house" points="400 100,250 250,400 400,550 250" id="house1" />
+            <polygon class="house" points="100 100, 250 250,400 100" id="house2" />
+            <polygon class="house" points="100 400,250 250,100 100" id="house3" />
+            <polygon class="house" points="250 250,100 400,250 550,400 400" id="house4" />
+            <polygon class="house" points="100 400,250 550,100 700" id="house5" />
+            <polygon class="house" points="100 700,250 550,400 700" id="house6" />
+            <polygon class="house" points="400 400,250 550,400 700,550 550" id="house7" />
+            <polygon class="house" points="400 700,550 550,700 700" id="house8" />
+            <polygon class="house" points="700 400,550 550,700 700" id="house9" />
+            <polygon class="house" points="550 250,700 400,550 550,400 400" id="house10" />
+            <polygon class="house" points="700 100,550 250,700 400" id="house11" />
+            <polygon class="house" points="400 100,550 250,700 100" id="house12" />
+            
+            <!-- Planet labels will be dynamically generated and appended here by the script. -->
+        </svg>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 1. DATA AND CONFIGURATION ---
+            
+            // Retrieve data from sessionStorage
+            const storedData = sessionStorage.getItem('astroData');
+            const chartData = storedData ? JSON.parse(storedData) : {};
+
+            const planetSymbols = { "Ascendant": "As", "Sun": "Su", "Moon": "Mo", "Mars": "Ma", "Mercury": "Me", "Jupiter": "Ju", "Venus": "Ve", "Saturn": "Sa", "Rahu": "Ra", "Ketu": "Ke" };
+            const svg = document.getElementById('astro-chart');
+
+            // --- 2. CORE FUNCTIONS ---
+
+            function parseAstroData(rawPlanetData) {
+                const parsedData = {};
+                for (const key in rawPlanetData) {
+                    const planet = rawPlanetData[key];
+                    if (planet && planet.name) {
+                        parsedData[planet.name] = {
+                            name: planet.name,
+                            sign: planet.current_sign,
+                            isRetro: planet.isRetro === 'true',
+                            degree: planet.normDegree
+                        };
+                    }
+                }
+                return parsedData;
+            }
+
+            function createSignToHouseMap(ascendantSign) {
+                const antiClockwiseHouseIds = ['house1', 'house2', 'house3', 'house4', 'house5', 'house6', 'house7', 'house8', 'house9', 'house10', 'house11', 'house12'];
+                const signToHouseIdMap = {};
+                for (let i = 0; i < 12; i++) {
+                    const signNumber = (ascendantSign - 1 + i) % 12 + 1;
+                    const physicalHouseId = antiClockwiseHouseIds[i];
+                    signToHouseIdMap[signNumber] = physicalHouseId;
+                }
+                return signToHouseIdMap;
+            }
+
+            function renderChart(astroData) {
+                if (!astroData.Ascendant) {
+                    console.error("Ascendant data is missing.");
+                    return;
+                }
+
+                const ascendantSign = astroData.Ascendant.sign;
+                const signToHouseMap = createSignToHouseMap(ascendantSign);
+
+                const housesWithPlanets = {};
+                for (const planetName in astroData) {
+                    const planet = astroData[planetName];
+                    const houseId = signToHouseMap[planet.sign];
+                    if (houseId) {
+                        if (!housesWithPlanets[houseId]) housesWithPlanets[houseId] = [];
+                        housesWithPlanets[houseId].push(planet);
+                    }
+                }
+
+                const houseIdToSignMap = {};
+                for (const sign in signToHouseMap) {
+                    houseIdToSignMap[signToHouseMap[sign]] = sign;
+                }
+
+                for (let i = 1; i <= 12; i++) {
+                    const houseId = `house${i}`;
+                    const housePolygon = document.getElementById(houseId);
+                    if (!housePolygon) continue;
+                    
+                    const bbox = housePolygon.getBBox();
+
+                    if (housesWithPlanets[houseId]) {
+                        const planetsInHouse = housesWithPlanets[houseId];
+                        const displayedSignsInHouse = new Set();
+                        planetsInHouse.forEach((planetInfo, index) => {
+                            const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                            const centerX = bbox.x + bbox.width / 2;
+                            const startY = (bbox.y + bbox.height / 2) - ((planetsInHouse.length - 1) * 22) / 2;
+                            textElement.setAttribute('x', centerX);
+                            textElement.setAttribute('y', startY + (index * 22));
+                            
+                            if (displayedSignsInHouse.has(planetInfo.sign)) {
+                                textElement.textContent = `${planetSymbols[planetInfo.name]} ${Math.round(planetInfo.degree)}°`;
+                            } else {
+                                textElement.textContent = `${planetSymbols[planetInfo.name]} ${Math.round(planetInfo.degree)}° (${planetInfo.sign})`;
+                                displayedSignsInHouse.add(planetInfo.sign);
+                            }
+                            
+                            textElement.classList.add('planet-label');
+                            if (planetInfo.name === "Ascendant") textElement.classList.add('ascendant-label');
+                            if (planetInfo.isRetro) textElement.classList.add('retrograde');
+                            svg.appendChild(textElement);
+                        });
+                    } else {
+                        const signForThisHouse = houseIdToSignMap[houseId];
+                        const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        textElement.setAttribute('x', bbox.x + bbox.width / 2);
+                        textElement.setAttribute('y', bbox.y + bbox.height / 2);
+                        textElement.textContent = `(${signForThisHouse})`;
+                        textElement.classList.add('planet-label', 'empty-house-marker');
+                        svg.appendChild(textElement);
+                    }
+                }
+            }
+
+            // --- 3. INITIALIZATION ---
+            const astroData = parseAstroData(chartData);
+            renderChart(astroData);
+        });
+    </script>
+
+</body>
+</html>

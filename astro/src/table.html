@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planetary Data Table</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="table-style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Planetary Data</h1>
+        <table id="planets-table">
+            <thead>
+                <tr>
+                    <th>Planet</th>
+                    <th>Sign</th>
+                    <th>Degree</th>
+                    <th>Retrograde</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Data will be inserted here by script.js -->
+            </tbody>
+        </table>
+        <a href="/" class="back-link">Go Back</a>
+    </div>
+
+    <script>
+        const interpretationData = {
+          Sun:      { debSign: 7,  debDeg: 10, exSign: 1,  exDeg: 10 },
+          Moon:     { debSign: 8,  debDeg: 3,  exSign: 2,  exDeg: 3 },
+          Mars:     { debSign: 4,  debDeg: 28, exSign: 10, exDeg: 28 },
+          Mercury:  { debSign: 12, debDeg: 15, exSign: 6,  exDeg: 15 },
+          Jupiter:  { debSign: 10, debDeg: 5,  exSign: 4,  exDeg: 5 },
+          Venus:    { debSign: 6,  debDeg: 27, exSign: 12, exDeg: 27 },
+          Saturn:   { debSign: 1,  debDeg: 20, exSign: 7,  exDeg: 20 },
+          Rahu:     { debSign: 8,  debDeg: NaN, exSign: 2, exDeg: NaN },
+          Ketu:     { debSign: 2,  debDeg: NaN, exSign: 8, exDeg: NaN }
+        };
+
+        function parseTableAndNotify() {
+          const table = document.querySelector('#planets-table');
+          const rows = table.querySelectorAll('tbody tr');
+          const output = [];
+
+          rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length !== 4) return; // Skip malformed or extra rows
+
+            const name = cells[0].textContent.trim();
+            const sign = parseInt(cells[1].textContent.trim());
+            const degree = parseFloat(cells[2].textContent.trim());
+
+            if (!interpretationData[name]) return;
+
+            const interp = interpretationData[name];
+            if (sign === interp.debSign && Math.abs(degree - interp.debDeg) <= 2) {
+              output.push(`${name} is debilitated (Sign ${sign}, Degree ${degree})`);
+            } else if (sign === interp.exSign && Math.abs(degree - interp.exDeg) <= 2) {
+              output.push(`${name} is exalted (Sign ${sign}, Degree ${degree})`);
+            }
+          });
+
+          const noteBox = document.createElement('div');
+          noteBox.className = 'planet-notes';
+          noteBox.style = `
+            background: #fff;
+            border-left: 4px solid #4a90e2;
+            padding: 1em;
+            margin: 1em auto;
+            max-width: 600px;
+            font-family: sans-serif;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+          `;
+          noteBox.innerHTML = '<strong>Planetary Highlights:</strong><br>' +
+            (output.length ? output.join('<br>') : 'comming soon');
+
+          const container = document.querySelector('.container');
+          container.insertBefore(noteBox, table);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const tableBody = document.querySelector('#planets-table tbody');
+            const storedData = sessionStorage.getItem('astroData');
+
+            if (storedData) {
+                const chartData = JSON.parse(storedData);
+                for (const key in chartData) {
+                    const planet = chartData[key];
+                    const deg = parseFloat(planet.normDegree);
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td data-label="Planet">${planet.name}</td>
+                        <td data-label="Sign">${planet.current_sign}</td>
+                        <td data-label="Degree">${deg.toFixed(2)}</td>
+                        <td data-label="Retrograde">${planet.isRetro === 'true' ? 'Yes' : 'No'}</td>
+                    `;
+                    tableBody.appendChild(row);
+                }
+                parseTableAndNotify();
+            } else {
+                tableBody.innerHTML = '<tr><td colspan="4">No data available. Please go back and submit the form.</td></tr>';
+            }
+        });
+    </script>
+</body>
+</html>
