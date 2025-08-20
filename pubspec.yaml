@@ -1,0 +1,41 @@
+name: firefly
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.3 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  web_socket_channel: ^3.0.1
+  permission_handler: ^11.3.1
+  sensors_plus: ^6.0.1
+  flutter_compass: ^0.8.1
+  proximity_sensor: ^1.0.2
+  device_info_plus: ^11.5.0
+  ambient_light: ^0.1.3   # <-- This is the corrected line
+  cupertino_icons: ^1.0.8
+  flutter_native_splash: ^2.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon.png"
+  min_sdk_android: 21 # android min sdk min:16, default 21
+
+flutter_native_splash:
+  color: "#ffffff"
+  image: assets/icon.png
+  android: true
+  ios: true
+
+flutter:
+  uses-material-design: true
